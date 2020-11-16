@@ -4,3 +4,7 @@ target/
 scalastyle-output.xml
 /node_modules/
 package-lock.json
+.vscode/
+*.project
+*.prefs
+*.classpath
