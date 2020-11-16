@@ -77,7 +77,7 @@ public class NGSIToMySQL extends AbstractSessionFactoryProcessor {
             .displayName("Attribute Persistence")
             .description("The mode of storing the data inside of the table")
             .required(false)
-            .allowableValues("row")
+            .allowableValues("row", "column")
             .defaultValue("row")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
@@ -254,6 +254,7 @@ public class NGSIToMySQL extends AbstractSessionFactoryProcessor {
                                 return newEnclosure;
                             });
                     System.out.println(tableName);
+                    getLogger().error(sql);
                     System.out.println(sql);
                     if (!exceptionHandler.execute(fc, flowFile, input -> {
 
@@ -262,7 +263,7 @@ public class NGSIToMySQL extends AbstractSessionFactoryProcessor {
                         try {
                             stmt.execute(mysql.createDb(dbName));
                             stmt.execute("Use " + dbName);
-                            stmt.execute(mysql.createTable(tableName, context.getProperty(ATTR_PERSISTENCE).getValue()));
+                            stmt.execute(mysql.createTable(tableName, context.getProperty(ATTR_PERSISTENCE).getValue(),  entity));
 
                         } catch (SQLException s) {
                             getLogger().error(s.toString());

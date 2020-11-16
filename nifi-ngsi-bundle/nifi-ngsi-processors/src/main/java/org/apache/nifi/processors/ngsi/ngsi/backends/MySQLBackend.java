@@ -9,27 +9,38 @@ import java.util.Iterator;
 
 public class MySQLBackend {
 
-    public ArrayList listOfFields (String attrPersistence){
+    public ArrayList listOfFields (String attrPersistence, Entity entity){
         ArrayList<String> aggregation = new ArrayList<>();
+
+        aggregation.add(NGSIConstants.RECV_TIME_TS);
+        aggregation.add(NGSIConstants.RECV_TIME);
+        aggregation.add(NGSIConstants.FIWARE_SERVICE_PATH);
+        aggregation.add(NGSIConstants.ENTITY_ID);
+        aggregation.add(NGSIConstants.ENTITY_TYPE);
+
         if (attrPersistence.compareToIgnoreCase("row")==0){
-            aggregation.add(NGSIConstants.RECV_TIME_TS);
-            aggregation.add(NGSIConstants.RECV_TIME);
-            aggregation.add(NGSIConstants.FIWARE_SERVICE_PATH);
-            aggregation.add(NGSIConstants.ENTITY_ID);
-            aggregation.add(NGSIConstants.ENTITY_TYPE);
             aggregation.add(NGSIConstants.ATTR_NAME);
             aggregation.add(NGSIConstants.ATTR_TYPE);
             aggregation.add(NGSIConstants.ATTR_VALUE);
             aggregation.add(NGSIConstants.ATTR_MD);
         }else if(attrPersistence.compareToIgnoreCase("column")==0){
             //TBD
+            ArrayList<Attributes> attributes = entity.getEntityAttrs();
+            if (attributes != null && !attributes.isEmpty()) {
+                for (Attributes attribute : attributes) {
+                    String attrName = attribute.getAttrName();
+                    aggregation.add(attrName);
+                    aggregation.add(attrName + "_md");
+                } // for
+            } // if
             System.out.println("column");
         }
         return aggregation;
     }
 
-    public String getValuesForInsert(Entity entity, long creationTime, String fiwareServicePath) {
+    public String getValuesForInsert(Entity entity, long creationTime, String fiwareServicePath, String attrPersistence) {
         String valuesForInsert = "";
+        if ((NGSIConstants.ATTR_PER_ROW).equalsIgnoreCase(attrPersistence)){
             for (int i = 0; i < entity.getEntityAttrs().size(); i++) {
                 if (i == 0) {
                     valuesForInsert += "(";
@@ -54,13 +65,31 @@ public class MySQLBackend {
                 valuesForInsert += ")";
 
             } // for
+        } else if((NGSIConstants.ATTR_PER_COLUMN).equalsIgnoreCase(attrPersistence)) {
+            int i=0;
+            valuesForInsert += "(";
+            valuesForInsert += "'" + creationTime + "'";
+            valuesForInsert += ",'" + new SimpleDateFormat("MM/dd/yyyy HH:mm:ss").format(creationTime) + "'";
+            valuesForInsert += ",'" + fiwareServicePath.replace("/", "") + "'";
+            valuesForInsert += ",'" + entity.getEntityId() + "'";
+            valuesForInsert += ",'" + entity.getEntityType() + "'";
+            for (Attributes attribute : entity.getEntityAttrs()) {
+                valuesForInsert += ",'" + attribute.getAttrValue() + "'";
+                if ( attribute.getMetadataString() != null && !attribute.getMetadataString().isEmpty()) {
+                    valuesForInsert += ",'" + attribute.getMetadataString() + "'";
+                } else {
+                    valuesForInsert += ",'[]'";
+                }
+            } //for
+            valuesForInsert += ")";
+        }
 
         return valuesForInsert;
     } // getValuesForInsert
 
 
-    public String getFieldsForCreate(String attrPersistence) {
-        Iterator it = listOfFields(attrPersistence).iterator();
+    public String getFieldsForCreate(String attrPersistence, Entity entity) {
+        Iterator it = listOfFields(attrPersistence, entity).iterator();
         String fieldsForCreate = "(";
         boolean first = true;
         while (it.hasNext()) {
@@ -75,11 +104,11 @@ public class MySQLBackend {
         return fieldsForCreate + ")";
     } // getFieldsForCreate
 
-    public String getFieldsForInsert(String attrPersistence) {
+    public String getFieldsForInsert(String attrPersistence, Entity entity) {
 
         String fieldsForInsert = "(";
         boolean first = true;
-        Iterator it = listOfFields(attrPersistence).iterator();
+        Iterator it = listOfFields(attrPersistence, entity).iterator();
         while (it.hasNext()) {
             if (first) {
                 fieldsForInsert += (String) it.next();
@@ -112,9 +141,9 @@ public class MySQLBackend {
         return query;
     }
 
-    public String createTable(String tableName, String attrPersistence){
+    public String createTable(String tableName, String attrPersistence, Entity entity){
 
-        String query= "create table if not exists `" + tableName + "`" + getFieldsForCreate(attrPersistence) + ";";
+        String query= "create table if not exists `" + tableName + "`" + getFieldsForCreate(attrPersistence, entity) + ";";
         return query;
     }
 
@@ -171,7 +200,8 @@ public class MySQLBackend {
     }
 
     public String insertQuery (Entity entity, long creationTime, String fiwareServicePath, String tableName, String dataModel){
-        String query="Insert into `" + tableName + "` " +this.getFieldsForInsert(dataModel)+ " values " +this.getValuesForInsert(entity, creationTime, fiwareServicePath);
+        String query="Insert into `" + tableName + "` " +this.getFieldsForInsert(dataModel, entity)+ " values " +this.getValuesForInsert(entity, creationTime, fiwareServicePath, dataModel);
+        System.out.println("MYSQL_BACKEND query is: "+query);
         return query;
     }
 }
